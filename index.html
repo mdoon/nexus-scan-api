@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS // SEC-SCAN</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --neon-purple: #b44fff;
+    --neon-cyan: #00f5ff;
+    --neon-pink: #ff006e;
+    --neon-green: #39ff14;
+    --dark-bg: #030008;
+    --panel-bg: rgba(10,0,25,0.85);
+    --border-glow: rgba(180,79,255,0.4);
+    --text-main: #e0c8ff;
+    --text-dim: #7a5c99;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--dark-bg);
+    color: var(--text-main);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(180,79,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(180,79,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridMove 20s linear infinite;
+    z-index:0;
+  }
+  body::after {
+    content:''; position:fixed; inset:0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(180,79,255,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse at 100% 100%, rgba(0,245,255,0.06) 0%, transparent 50%);
+    z-index:0; pointer-events:none;
+  }
+  @keyframes gridMove { 100% { transform: translateY(40px); } }
+  @keyframes blink { 50% { opacity:0; } }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  @keyframes fadeInDown { from{opacity:0;transform:translateY(-20px);} to{opacity:1;transform:translateY(0);} }
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+  @keyframes sweep { 0%{left:-60%;} 100%{left:110%;} }
+  @keyframes cardAppear { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+  @keyframes spin { 100%{transform:rotate(360deg);} }
+
+  .container { position:relative; z-index:1; max-width:920px; margin:0 auto; padding:40px 20px 80px; }
+
+  /* Header */
+  .header { text-align:center; margin-bottom:50px; animation:fadeInDown 0.8s ease; }
+  .logo-eyebrow { font-size:11px; letter-spacing:6px; color:var(--neon-cyan); margin-bottom:8px; opacity:0.8; }
+  .logo {
+    font-family:'Orbitron',sans-serif; font-size:clamp(32px,7vw,64px); font-weight:900;
+    letter-spacing:4px; line-height:1;
+    background:linear-gradient(135deg,#fff 0%,var(--neon-purple) 40%,var(--neon-cyan) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    filter:drop-shadow(0 0 30px rgba(180,79,255,0.5)); margin-bottom:4px;
+  }
+  .logo-slash { color:var(--neon-pink); -webkit-text-fill-color:var(--neon-pink); filter:drop-shadow(0 0 10px var(--neon-pink)); }
+  .tagline { font-size:11px; letter-spacing:3px; color:var(--text-dim); margin-top:12px; }
+  .tagline span { color:var(--neon-purple); animation:blink 1.5s step-end infinite; }
+  .deco-line { display:flex; align-items:center; gap:12px; margin:20px 0; opacity:0.6; }
+  .deco-line::before,.deco-line::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,transparent,var(--neon-purple),transparent); }
+  .deco-line-text { font-size:10px; letter-spacing:4px; color:var(--neon-purple); }
+
+  /* Panel */
+  .scanner-panel {
+    background:var(--panel-bg); border:1px solid var(--border-glow); border-radius:4px;
+    padding:32px; position:relative; overflow:hidden;
+    animation:fadeInUp 0.8s ease 0.2s both;
+    box-shadow:0 0 40px rgba(180,79,255,0.1),inset 0 0 60px rgba(0,0,0,0.5);
+  }
+  .scanner-panel::before { content:''; position:absolute; top:0;left:0;right:0; height:1px; background:linear-gradient(90deg,transparent,var(--neon-purple),var(--neon-cyan),transparent); }
+  .scan-sweep { position:absolute; top:0;left:-100%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(180,79,255,0.04),transparent); animation:sweep 3s ease-in-out infinite; }
+  .corner { position:absolute; width:16px; height:16px; border-color:var(--neon-purple); border-style:solid; opacity:0.7; }
+  .corner-tl{top:8px;left:8px;border-width:1px 0 0 1px;}
+  .corner-tr{top:8px;right:8px;border-width:1px 1px 0 0;}
+  .corner-bl{bottom:8px;left:8px;border-width:0 0 1px 1px;}
+  .corner-br{bottom:8px;right:8px;border-width:0 1px 1px 0;}
+  .panel-label { font-size:10px; letter-spacing:4px; color:var(--neon-purple); margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+  .panel-label::before { content:'■'; font-size:6px; color:var(--neon-cyan); animation:pulse 2s ease-in-out infinite; }
+
+  /* Input */
+  .input-group { display:flex; gap:0; margin-bottom:20px; }
+  .url-prefix { background:rgba(180,79,255,0.15); border:1px solid var(--border-glow); border-right:none; padding:14px 16px; font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--neon-cyan); letter-spacing:1px; border-radius:3px 0 0 3px; white-space:nowrap; }
+  .url-input { flex:1; background:rgba(0,0,0,0.6); border:1px solid var(--border-glow); border-right:none; padding:14px 16px; font-family:'Share Tech Mono',monospace; font-size:14px; color:#fff; outline:none; transition:all 0.3s; letter-spacing:1px; }
+  .url-input::placeholder { color:var(--text-dim); }
+  .url-input:focus { border-color:var(--neon-purple); box-shadow:0 0 20px rgba(180,79,255,0.2); background:rgba(180,79,255,0.05); }
+  .scan-btn { background:linear-gradient(135deg,var(--neon-purple),#7000cc); border:none; padding:14px 28px; font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; letter-spacing:3px; color:#fff; cursor:pointer; border-radius:0 3px 3px 0; transition:all 0.3s; position:relative; overflow:hidden; white-space:nowrap; }
+  .scan-btn::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg,var(--neon-cyan),var(--neon-purple)); opacity:0; transition:opacity 0.3s; }
+  .scan-btn:hover::before { opacity:1; }
+  .scan-btn:hover { box-shadow:0 0 30px rgba(180,79,255,0.6); }
+  .scan-btn:disabled { opacity:0.6; cursor:not-allowed; }
+  .scan-btn span { position:relative; z-index:1; }
+
+  /* API endpoint display */
+  .api-config { margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .api-label { font-size:10px; letter-spacing:2px; color:var(--text-dim); }
+  .api-input { background:rgba(0,0,0,0.5); border:1px solid rgba(180,79,255,0.2); padding:6px 12px; font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--neon-cyan); outline:none; border-radius:2px; width:320px; transition:border-color 0.3s; }
+  .api-input:focus { border-color:var(--neon-purple); }
+
+  /* Options */
+  .scan-options { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+  .option-chip { display:flex; align-items:center; gap:8px; padding:6px 14px; border:1px solid rgba(180,79,255,0.3); border-radius:2px; font-size:11px; letter-spacing:2px; color:var(--text-dim); cursor:pointer; transition:all 0.2s; user-select:none; }
+  .option-chip:hover { border-color:var(--neon-purple); color:var(--neon-purple); }
+  .option-chip.active { background:rgba(180,79,255,0.15); border-color:var(--neon-purple); color:var(--neon-purple); box-shadow:0 0 10px rgba(180,79,255,0.2); }
+  .option-chip .dot { width:6px;height:6px;border-radius:50%;background:var(--text-dim);transition:all 0.2s; }
+  .option-chip.active .dot { background:var(--neon-green); box-shadow:0 0 8px var(--neon-green); }
+
+  /* Results */
+  .results-area { margin-top:32px; display:none; }
+  .results-area.visible { display:block; animation:fadeInUp 0.5s ease; }
+
+  /* Progress */
+  .scan-line-label { display:flex; justify-content:space-between; font-size:11px; margin-bottom:8px; color:var(--text-dim); }
+  .scan-line-label .status { color:var(--neon-cyan); animation:blink 0.8s step-end infinite; }
+  .progress-track { height:3px; background:rgba(180,79,255,0.1); border-radius:2px; overflow:hidden; margin-bottom:20px; }
+  .progress-fill { height:100%; background:linear-gradient(90deg,var(--neon-purple),var(--neon-cyan)); border-radius:2px; width:0%; transition:width 0.4s ease; box-shadow:0 0 10px var(--neon-purple); }
+
+  /* Terminal */
+  .terminal { background:rgba(0,0,0,0.7); border:1px solid rgba(180,79,255,0.2); border-radius:3px; padding:16px; margin-bottom:24px; height:180px; overflow-y:auto; font-size:12px; line-height:1.8; }
+  .terminal::-webkit-scrollbar { width:4px; }
+  .terminal::-webkit-scrollbar-thumb { background:var(--neon-purple); border-radius:2px; }
+  .log-line { color:var(--text-dim); }
+  .log-line.ok { color:var(--neon-green); }
+  .log-line.warn { color:#ffcc00; }
+  .log-line.error { color:var(--neon-pink); }
+  .log-line.info { color:var(--neon-cyan); }
+
+  /* Risk */
+  .risk-display { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:20px; background:rgba(0,0,0,0.5); border:1px solid var(--border-glow); border-radius:3px; padding:20px 24px; margin-bottom:24px; }
+  .risk-score { font-family:'Orbitron',sans-serif; font-size:48px; font-weight:900; line-height:1; text-align:center; min-width:80px; }
+  .risk-label { font-size:10px; letter-spacing:3px; color:var(--text-dim); margin-bottom:6px; }
+  .risk-bar-track { height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; }
+  .risk-bar-fill { height:100%; border-radius:4px; transition:width 1s cubic-bezier(0.34,1.56,0.64,1); width:0%; }
+  .risk-badge { font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; letter-spacing:2px; padding:6px 14px; border-radius:2px; text-align:center; white-space:nowrap; }
+
+  /* Summary bar */
+  .summary-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+  .summary-chip { padding:6px 16px; border-radius:2px; font-size:11px; letter-spacing:2px; border:1px solid; }
+  .summary-chip.critical { color:var(--neon-pink); border-color:rgba(255,0,110,0.4); background:rgba(255,0,110,0.08); }
+  .summary-chip.high { color:#ff6600; border-color:rgba(255,102,0,0.4); background:rgba(255,102,0,0.08); }
+  .summary-chip.medium { color:#ffcc00; border-color:rgba(255,204,0,0.4); background:rgba(255,204,0,0.08); }
+  .summary-chip.low { color:var(--neon-green); border-color:rgba(57,255,20,0.4); background:rgba(57,255,20,0.08); }
+
+  /* Filter tabs */
+  .filter-tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .filter-tab { padding:5px 14px; border:1px solid rgba(180,79,255,0.2); border-radius:2px; font-size:10px; letter-spacing:2px; color:var(--text-dim); cursor:pointer; transition:all 0.2s; }
+  .filter-tab:hover, .filter-tab.active { border-color:var(--neon-purple); color:var(--neon-purple); background:rgba(180,79,255,0.1); }
+
+  /* Findings */
+  .findings-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+  .finding-card { background:rgba(0,0,0,0.5); border:1px solid rgba(180,79,255,0.2); border-radius:3px; padding:16px; position:relative; overflow:hidden; transition:all 0.3s; animation:cardAppear 0.4s ease both; }
+  .finding-card:hover { border-color:var(--neon-purple); transform:translateY(-2px); box-shadow:0 8px 30px rgba(180,79,255,0.15); }
+  .finding-card::before { content:''; position:absolute; top:0;left:0; width:3px; height:100%; }
+  .finding-card.severity-critical::before { background:var(--neon-pink); }
+  .finding-card.severity-high::before { background:#ff6600; }
+  .finding-card.severity-medium::before { background:#ffcc00; }
+  .finding-card.severity-low::before { background:var(--neon-green); }
+  .finding-card.severity-info::before { background:var(--neon-cyan); }
+  .finding-severity { font-size:9px; letter-spacing:3px; margin-bottom:8px; font-weight:700; }
+  .severity-critical .finding-severity{color:var(--neon-pink);}
+  .severity-high .finding-severity{color:#ff6600;}
+  .severity-medium .finding-severity{color:#ffcc00;}
+  .severity-low .finding-severity{color:var(--neon-green);}
+  .severity-info .finding-severity{color:var(--neon-cyan);}
+  .finding-title { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .finding-desc { font-size:11px; color:var(--text-dim); line-height:1.6; }
+  .finding-cve { margin-top:10px; font-size:10px; color:rgba(180,79,255,0.6); letter-spacing:1px; }
+  .finding-meta { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .source-badge { font-size:9px; letter-spacing:2px; padding:2px 8px; border-radius:2px; font-weight:700; }
+  .source-badge.builtin { color:var(--neon-cyan); border:1px solid rgba(0,245,255,0.3); background:rgba(0,245,255,0.07); }
+  .source-badge.nuclei  { color:#b44fff; border:1px solid rgba(180,79,255,0.4); background:rgba(180,79,255,0.1); }
+  .template-id { font-size:9px; color:rgba(180,79,255,0.45); letter-spacing:1px; font-family:'Share Tech Mono',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+
+  /* Error banner */
+  .error-banner { background:rgba(255,0,110,0.1); border:1px solid rgba(255,0,110,0.4); border-radius:3px; padding:16px 20px; margin-bottom:20px; font-size:13px; color:var(--neon-pink); display:none; }
+  .error-banner.visible { display:block; }
+
+  .footer { text-align:center; margin-top:60px; font-size:10px; letter-spacing:3px; color:rgba(122,92,153,0.4); }
+
+  @media(max-width:600px){
+    .input-group{flex-wrap:wrap;}
+    .url-prefix{border-radius:3px 3px 0 0;border-right:1px solid var(--border-glow);border-bottom:none;width:100%;}
+    .url-input{border-radius:0;border-right:1px solid var(--border-glow);border-bottom:none;}
+    .scan-btn{border-radius:0 0 3px 3px;width:100%;}
+    .risk-display{grid-template-columns:1fr;text-align:center;}
+    .api-input{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo-eyebrow">◈ ADVANCED THREAT INTELLIGENCE SYSTEM ◈</div>
+    <div class="logo">NEXUS<span class="logo-slash">//</span>SCAN</div>
+    <div class="tagline">VULNERABILITY DETECTION + PASSIVE ANALYSIS ENGINE <span>█</span></div>
+    <div class="deco-line"><span class="deco-line-text">SYSTEM ONLINE</span></div>
+  </div>
+
+  <div class="scanner-panel">
+    <div class="scan-sweep"></div>
+    <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+
+    <div class="panel-label">TARGET ACQUISITION</div>
+
+    <!-- API endpoint設定 -->
+    <div class="api-config">
+      <span class="api-label">API ENDPOINT:</span>
+      <input type="text" class="api-input" id="apiEndpoint" value="https://nexus-scan-api.vercel.app" placeholder="https://nexus-scan-api.vercel.app">
+    </div>
+
+    <div class="input-group">
+      <div class="url-prefix">HTTPS://</div>
+      <input type="text" class="url-input" id="urlInput" placeholder="target-domain.com" />
+      <button class="scan-btn" id="scanBtn" onclick="startScan()"><span>SCAN ▶</span></button>
+    </div>
+
+    <div class="scan-options">
+      <div class="option-chip active"><div class="dot"></div>SSL AUDIT</div>
+      <div class="option-chip active"><div class="dot"></div>HEADER CHECK</div>
+      <div class="option-chip active"><div class="dot"></div>XSS PROBE</div>
+      <div class="option-chip active"><div class="dot"></div>SQLI DETECT</div>
+      <div class="option-chip active"><div class="dot"></div>COOKIE SCAN</div>
+      <div class="option-chip active" id="nucleiChip"><div class="dot"></div>NUCLEI SCAN</div>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div class="results-area" id="resultsArea">
+      <!-- Progress -->
+      <div id="scanProgress">
+        <div class="scan-line-label">
+          <span id="progressLabel">スキャン準備中...</span>
+          <span class="status" id="progressPct">0%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal" id="terminal"></div>
+
+      <!-- Risk Score -->
+      <div class="risk-display" id="riskDisplay" style="display:none">
+        <div class="risk-score" id="riskScore">--</div>
+        <div>
+          <div class="risk-label">THREAT LEVEL</div>
+          <div class="risk-bar-track"><div class="risk-bar-fill" id="riskBar"></div></div>
+        </div>
+        <div class="risk-badge" id="riskBadge">---</div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary-bar" id="summaryBar"></div>
+
+      <!-- Filter -->
+      <div class="filter-tabs" id="filterTabs"></div>
+
+      <!-- Findings -->
+      <div class="findings-grid" id="findingsGrid"></div>
+    </div>
+  </div>
+
+  <div class="footer">NEXUS // SEC-SCAN v3.0 &nbsp;|&nbsp; PASSIVE ANALYSIS ONLY &nbsp;|&nbsp; FOR AUTHORIZED USE ONLY</div>
+</div>
+
+<script>
+// ── ユーティリティ ────────────────────────────────
+function addLog(text, type) {
+  const terminal = document.getElementById('terminal');
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.textContent = text;
+  terminal.appendChild(line);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  if (label) document.getElementById('progressLabel').textContent = label;
+}
+
+function showError(msg) {
+  const b = document.getElementById('errorBanner');
+  b.textContent = '⚠ ' + msg;
+  b.classList.add('visible');
+}
+
+function hideError() {
+  document.getElementById('errorBanner').classList.remove('visible');
+}
+
+// ── リスクスコア表示 ──────────────────────────────
+function showRiskScore(score) {
+  const display = document.getElementById('riskDisplay');
+  display.style.display = 'grid';
+
+  const scoreEl = document.getElementById('riskScore');
+  const barEl = document.getElementById('riskBar');
+  const badgeEl = document.getElementById('riskBadge');
+
+  scoreEl.textContent = score;
+
+  let color, label;
+  if (score >= 70) {
+    color = 'var(--neon-pink)'; label = 'CRITICAL RISK';
+    barEl.style.background = 'linear-gradient(90deg, #ff6600, var(--neon-pink))';
+    badgeEl.style.cssText = 'background:rgba(255,0,110,0.15);border:1px solid rgba(255,0,110,0.5);color:var(--neon-pink)';
+  } else if (score >= 45) {
+    color = '#ff6600'; label = 'HIGH RISK';
+    barEl.style.background = 'linear-gradient(90deg, #ffcc00, #ff6600)';
+    badgeEl.style.cssText = 'background:rgba(255,102,0,0.15);border:1px solid rgba(255,102,0,0.5);color:#ff6600';
+  } else if (score >= 20) {
+    color = '#ffcc00'; label = 'MEDIUM RISK';
+    barEl.style.background = 'linear-gradient(90deg, var(--neon-green), #ffcc00)';
+    badgeEl.style.cssText = 'background:rgba(255,204,0,0.15);border:1px solid rgba(255,204,0,0.5);color:#ffcc00';
+  } else {
+    color = 'var(--neon-green)'; label = 'LOW RISK';
+    barEl.style.background = 'var(--neon-green)';
+    badgeEl.style.cssText = 'background:rgba(57,255,20,0.15);border:1px solid rgba(57,255,20,0.5);color:var(--neon-green)';
+  }
+
+  scoreEl.style.color = color;
+  scoreEl.style.textShadow = `0 0 20px ${color}`;
+  barEl.style.boxShadow = `0 0 10px ${color}`;
+  badgeEl.textContent = label;
+
+  setTimeout(() => { barEl.style.width = score + '%'; }, 100);
+}
+
+// ── サマリーバー ──────────────────────────────────
+function showSummary(findings, summary) {
+  const counts = {critical:0, high:0, medium:0, low:0};
+  findings.forEach(f => { if (counts[f.severity] !== undefined) counts[f.severity]++; });
+
+  const bar = document.getElementById('summaryBar');
+  bar.innerHTML = '';
+  const labels = {critical:'CRITICAL', high:'HIGH', medium:'MEDIUM', low:'LOW'};
+  Object.entries(counts).forEach(([sev, cnt]) => {
+    if (cnt > 0) {
+      const chip = document.createElement('div');
+      chip.className = `summary-chip ${sev}`;
+      chip.textContent = `${labels[sev]}: ${cnt}`;
+      bar.appendChild(chip);
+    }
+  });
+
+  // nuclei / builtin 内訳
+  if (summary && (summary.nuclei_issues > 0 || summary.builtin_issues > 0)) {
+    const sep = document.createElement('div');
+    sep.style.cssText = 'margin-left:auto;display:flex;gap:8px;align-items:center;';
+    if (summary.builtin_issues > 0) {
+      const b = document.createElement('span');
+      b.className = 'source-badge builtin';
+      b.textContent = `BUILT-IN: ${summary.builtin_issues}`;
+      sep.appendChild(b);
+    }
+    if (summary.nuclei_issues > 0) {
+      const n = document.createElement('span');
+      n.className = 'source-badge nuclei';
+      n.textContent = `NUCLEI: ${summary.nuclei_issues}`;
+      sep.appendChild(n);
+    }
+    bar.appendChild(sep);
+  }
+}
+
+// ── フィルタータブ ─────────────────────────────────
+let currentFilter = 'all';
+let allFindings = [];
+
+function renderFindings(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t.dataset.filter === filter));
+  const grid = document.getElementById('findingsGrid');
+  grid.innerHTML = '';
+  const filtered = filter === 'all' ? allFindings : allFindings.filter(f => f.severity === filter);
+  filtered.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = `finding-card severity-${f.severity}`;
+    card.style.animationDelay = (i * 0.05) + 's';
+    const sourceLabel = f.source === 'nuclei' ? 'NUCLEI' : 'BUILT-IN';
+    const templateLine = f.template_id ? `<span class="template-id">${escHtml(f.template_id)}</span>` : '';
+    card.innerHTML = `
+      <div class="finding-severity">◆ ${f.severity.toUpperCase()}</div>
+      <div class="finding-title">${escHtml(f.title)}</div>
+      <div class="finding-desc">${escHtml(f.desc)}</div>
+      <div class="finding-meta">
+        <span class="finding-cve" style="margin-top:0">${escHtml(f.cve)}</span>
+        <span class="source-badge ${f.source || 'builtin'}">${sourceLabel}</span>
+        ${templateLine}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function buildFilterTabs(findings) {
+  const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'];
+  const counts = {};
+  findings.forEach(f => { counts[f.severity] = (counts[f.severity] || 0) + 1; });
+
+  const container = document.getElementById('filterTabs');
+  container.innerHTML = '';
+  severities.forEach(sev => {
+    const cnt = sev === 'all' ? findings.length : (counts[sev] || 0);
+    if (cnt === 0 && sev !== 'all') return;
+    const tab = document.createElement('div');
+    tab.className = 'filter-tab' + (sev === 'all' ? ' active' : '');
+    tab.dataset.filter = sev;
+    tab.textContent = `${sev.toUpperCase()} (${cnt})`;
+    tab.onclick = () => renderFindings(sev);
+    container.appendChild(tab);
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── メインスキャン関数 ────────────────────────────
+async function startScan() {
+  const urlInput = document.getElementById('urlInput').value.trim();
+  const apiBase = document.getElementById('apiEndpoint').value.trim().replace(/\/$/, '');
+
+  if (!urlInput) {
+    document.getElementById('urlInput').style.borderColor = 'var(--neon-pink)';
+    setTimeout(() => { document.getElementById('urlInput').style.borderColor = ''; }, 1000);
+    return;
+  }
+
+  if (!apiBase || apiBase === 'https://your-project.vercel.app') {
+    showError('API ENDPOINTにVercelのデプロイURLを入力してください。');
+    return;
+  }
+
+  // リセット
+  hideError();
+  document.getElementById('resultsArea').classList.add('visible');
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('findingsGrid').innerHTML = '';
+  document.getElementById('summaryBar').innerHTML = '';
+  document.getElementById('filterTabs').innerHTML = '';
+  document.getElementById('riskDisplay').style.display = 'none';
+  document.getElementById('scanProgress').style.display = 'block';
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanBtn').querySelector('span').textContent = 'SCANNING...';
+
+  setProgress(5, 'APIに接続中...');
+  addLog('[INIT] NEXUS SCAN ENGINE 起動...', 'info');
+  addLog(`[TARGET] ${urlInput}`, 'info');
+
+  try {
+    setProgress(15, 'スキャンリクエスト送信中...');
+    addLog('[API] バックエンドにリクエスト送信中...', 'info');
+
+    const runNuclei = document.getElementById('nucleiChip').classList.contains('active');
+
+    const res = await fetch(`${apiBase}/api/scan`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: urlInput, run_nuclei: runNuclei})
+    });
+
+    if (!res.ok) {
+      throw new Error(`APIエラー: HTTP ${res.status}`);
+    }
+
+    setProgress(40, 'レスポンス処理中...');
+    const data = await res.json();
+
+    // ログ表示
+    if (data.logs) {
+      for (let i = 0; i < data.logs.length; i++) {
+        const log = data.logs[i];
+        addLog(log.text, log.type);
+        const pct = 40 + Math.round((i / data.logs.length) * 50);
+        setProgress(pct, log.text.replace(/^\[.*?\]\s/, ''));
+        await new Promise(r => setTimeout(r, 80));
+      }
+    }
+
+    setProgress(100, 'スキャン完了');
+
+    // 結果表示
+    await new Promise(r => setTimeout(r, 300));
+    document.getElementById('scanProgress').style.display = 'none';
+
+    allFindings = data.findings || [];
+    showRiskScore(data.risk_score || 0);
+    showSummary(allFindings, data.summary);
+    buildFilterTabs(allFindings);
+    renderFindings('all');
+
+  } catch (err) {
+    setProgress(100, 'エラー');
+    addLog(`[ERROR] ${err.message}`, 'error');
+    showError(`接続エラー: ${err.message} — VercelのURLとCORS設定を確認してください。`);
+  }
+
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('scanBtn').querySelector('span').textContent = 'SCAN ▶';
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') startScan(); });
+document.querySelectorAll('.option-chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
+</script>
+</body>
+</html>
